@@ -22,7 +22,9 @@ The wrapper runs the bundled Python package through `uv`, so the caller does not
 1. Read `references/configuration.md` and set:
    - `CONTEXT_HUB_BASE_URL`
    - `CONTEXT_HUB_TOKEN`
-2. Use the bundled wrapper:
+   - `CONTEXT_HUB_USER_ID`
+2. If the target machine uses Bash, prefer login-shell startup files (`~/.bash_profile` or `~/.profile`) for these exports, or place them above any non-interactive early `return` in `~/.bashrc`; many agents use `bash -lc`, so exports placed after that return will be invisible.
+3. Use the bundled wrapper:
 
 ```bash
 ./scripts/ctx_cli ls ctx://YOUR_USER_ID
@@ -33,7 +35,9 @@ The wrapper runs the bundled Python package through `uv`, so the caller does not
 ## Common commands
 
 ```bash
-./scripts/ctx_cli register-workspace --user-id YOUR_USER_ID --default
+export CONTEXT_HUB_USER_ID="YOUR_USER_ID"
+
+./scripts/ctx_cli register-workspace --default
 ./scripts/ctx_cli mkdir ctx://YOUR_USER_ID/defaultWorkspace/tasks
 ./scripts/ctx_cli stat ctx://YOUR_USER_ID/defaultWorkspace/tasks
 ./scripts/ctx_cli write ctx://YOUR_USER_ID/defaultWorkspace/tasks/today.md --text "hello"
@@ -44,8 +48,11 @@ The wrapper runs the bundled Python package through `uv`, so the caller does not
 Search/import examples:
 
 ```bash
-./scripts/ctx_cli search --user-id YOUR_USER_ID --query ContextHub --scope-uri ctx://YOUR_USER_ID/defaultWorkspace
-./scripts/ctx_cli grep --user-id YOUR_USER_ID --pattern cloud --scope-uri ctx://YOUR_USER_ID/defaultWorkspace --glob 'tasks/*.md'
+./scripts/ctx_cli search --query ContextHub --scope-uri ctx://YOUR_USER_ID/defaultWorkspace
+./scripts/ctx_cli search --query 'cloud cutover' --mode hybrid
+./scripts/ctx_cli search --query 'phase1' --workspace-mode user --mode lexical --expansion import-tree --expansion 24040
+./scripts/ctx_cli reindex --scope-uri ctx://YOUR_USER_ID/defaultWorkspace
+./scripts/ctx_cli grep --pattern cloud --scope-uri ctx://YOUR_USER_ID/defaultWorkspace --glob 'tasks/*.md'
 ./scripts/ctx_cli import-tree /path/to/memory ctx://YOUR_USER_ID/defaultWorkspace/memory --include '*.md'
 ```
 
@@ -54,7 +61,7 @@ Search/import examples:
 If the caller wants a real shell command on `PATH`:
 
 ```bash
-uv tool install --from . ctx-cli-skill --force
+uv tool install --from . ctx-cli-skill --force --reinstall --refresh --no-cache
 ctx_cli ls ctx://YOUR_USER_ID
 ```
 

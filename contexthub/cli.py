@@ -16,6 +16,13 @@ def _base_url(value: str | None) -> str:
     return (value or os.getenv("CONTEXT_HUB_BASE_URL") or "http://127.0.0.1:4040").rstrip("/")
 
 
+def _user_id(value: str | None) -> str:
+    resolved = (value or os.getenv("CONTEXT_HUB_USER_ID") or "").strip()
+    if not resolved:
+        raise typer.BadParameter("provide --user-id or set CONTEXT_HUB_USER_ID")
+    return resolved
+
+
 def _request(method: str, path: str, *, base_url: str, payload: dict[str, Any] | None = None, params: dict[str, Any] | None = None) -> Any:
     headers: dict[str, str] = {}
     token = os.getenv("CONTEXT_HUB_TOKEN")
@@ -58,11 +65,12 @@ def _should_keep(relative_path: PurePosixPath, includes: list[str], excludes: li
 
 @app.command("register-workspace")
 def register_workspace(
-    user_id: str = typer.Option(..., "--user-id"),
+    user_id: str | None = typer.Option(None, "--user-id", envvar="CONTEXT_HUB_USER_ID"),
     default: bool = typer.Option(False, "--default"),
     agent_id: str | None = typer.Option(None, "--agent-id"),
     base_url: str | None = typer.Option(None, "--base-url"),
 ) -> None:
+    user_id = _user_id(user_id)
     workspace_kind = "defaultWorkspace" if default else "agentWorkspace"
     if not default and not agent_id:
         raise typer.BadParameter("--agent-id is required unless --default is used")
@@ -244,14 +252,35 @@ def remove(
     _print(_request("POST", "/v1/fs/rm", base_url=base_url, payload={"uri": uri, "recursive": recursive}))
 
 
+@app.command("reindex")
+def reindex(
+    user_id: str | None = typer.Option(None, "--user-id", envvar="CONTEXT_HUB_USER_ID"),
+    scope_uri: str | None = typer.Option(None, "--scope-uri"),
+    base_url: str | None = typer.Option(None, "--base-url"),
+) -> None:
+    user_id = _user_id(user_id)
+    _print(
+        _request(
+            "POST",
+            "/v1/fs/reindex",
+            base_url=base_url,
+            payload={
+                "userId": user_id,
+                "scopeUri": scope_uri,
+            },
+        )
+    )
+
+
 @app.command("glob")
 def glob(
-    user_id: str = typer.Option(..., "--user-id"),
+    user_id: str | None = typer.Option(None, "--user-id", envvar="CONTEXT_HUB_USER_ID"),
     pattern: str = typer.Option(..., "--pattern"),
     scope_uri: str | None = typer.Option(None, "--scope-uri"),
     limit: int = typer.Option(100, "--limit"),
     base_url: str | None = typer.Option(None, "--base-url"),
 ) -> None:
+    user_id = _user_id(user_id)
     _print(
         _request(
             "POST",
@@ -269,7 +298,7 @@ def glob(
 
 @app.command("grep")
 def grep(
-    user_id: str = typer.Option(..., "--user-id"),
+    user_id: str | None = typer.Option(None, "--user-id", envvar="CONTEXT_HUB_USER_ID"),
     pattern: str = typer.Option(..., "--pattern"),
     scope_uri: str | None = typer.Option(None, "--scope-uri"),
     limit: int = typer.Option(100, "--limit"),
@@ -277,6 +306,7 @@ def grep(
     glob_pattern: str | None = typer.Option(None, "--glob"),
     base_url: str | None = typer.Option(None, "--base-url"),
 ) -> None:
+    user_id = _user_id(user_id)
     _print(
         _request(
             "POST",
@@ -296,7 +326,7 @@ def grep(
 
 @app.command("rg")
 def rg(
-    user_id: str = typer.Option(..., "--user-id"),
+    user_id: str | None = typer.Option(None, "--user-id", envvar="CONTEXT_HUB_USER_ID"),
     pattern: str = typer.Option(..., "--pattern"),
     scope_uri: str | None = typer.Option(None, "--scope-uri"),
     limit: int = typer.Option(100, "--limit"),
@@ -304,6 +334,7 @@ def rg(
     glob_pattern: str | None = typer.Option(None, "--glob"),
     base_url: str | None = typer.Option(None, "--base-url"),
 ) -> None:
+    user_id = _user_id(user_id)
     _print(
         _request(
             "POST",
@@ -323,12 +354,20 @@ def rg(
 
 @app.command("search")
 def search(
-    user_id: str = typer.Option(..., "--user-id"),
+    user_id: str | None = typer.Option(None, "--user-id", envvar="CONTEXT_HUB_USER_ID"),
     query: str = typer.Option(..., "--query"),
     scope_uri: str | None = typer.Option(None, "--scope-uri"),
+    mode: str = typer.Option("auto", "--mode"),
+    expansion: list[str] = typer.Option(None, "--expansion"),
+    glob_pattern: str | None = typer.Option(None, "--glob"),
+    path_prefix: str | None = typer.Option(None, "--path-prefix"),
+    workspace_mode: str = typer.Option("default-only", "--workspace-mode"),
+    rerank: bool | None = typer.Option(None, "--rerank/--no-rerank"),
+    explain: bool = typer.Option(True, "--explain/--no-explain"),
     limit: int = typer.Option(20, "--limit"),
     base_url: str | None = typer.Option(None, "--base-url"),
 ) -> None:
+    user_id = _user_id(user_id)
     _print(
         _request(
             "POST",
@@ -338,6 +377,13 @@ def search(
                 "userId": user_id,
                 "query": query,
                 "scopeUri": scope_uri,
+                "mode": mode,
+                "expansions": expansion or [],
+                "glob": glob_pattern,
+                "pathPrefix": path_prefix,
+                "workspaceMode": workspace_mode,
+                "rerank": rerank,
+                "explain": explain,
                 "limit": limit,
             },
         )
