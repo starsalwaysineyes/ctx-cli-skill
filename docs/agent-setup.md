@@ -5,7 +5,7 @@ This is the fastest path for a new agent or coding environment that needs Contex
 ## Install
 
 ```bash
-npm install -g @starsalwaysineyes/ctx-cli
+npm install -g @shiuing/ctx-cli
 ```
 
 ## Configure

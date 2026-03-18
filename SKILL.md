@@ -74,7 +74,7 @@ ctx_cli ls ctx://YOUR_USER_ID
 If the caller wants a config-file-first CLI without relying on shell exports:
 
 ```bash
-npm install -g @starsalwaysineyes/ctx-cli
+npm install -g @shiuing/ctx-cli
 ctx_cli config set baseUrl http://YOUR_HOST:24040
 ctx_cli config set userId YOUR_USER_ID
 printf '%s' 'YOUR_BEARER_TOKEN' | ctx_cli config set token --stdin

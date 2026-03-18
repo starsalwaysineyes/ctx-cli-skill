@@ -5,7 +5,7 @@ npm-installable `ctx_cli` for ContextHub phase-1 filesystem access.
 ## Install
 
 ```bash
-npm install -g @starsalwaysineyes/ctx-cli
+npm install -g @shiuing/ctx-cli
 ```
 
 ## Configure
