@@ -58,6 +58,8 @@ Validate with:
 bash -lc 'printf "%s\n" "$CONTEXT_HUB_BASE_URL" "$CONTEXT_HUB_USER_ID"'
 ```
 
+If you want the npm/config-file-first path, read `docs/agent-setup.md` first.
+
 ## Three ways to use the repo
 
 ### 1. No install, use bundled wrapper

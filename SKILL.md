@@ -22,7 +22,8 @@ The wrapper runs the bundled Python package through `uv`, so the caller does not
 
 ## Quick start
 
-1. Read `references/configuration.md` and set:
+1. For the npm/config-file path, read `docs/agent-setup.md`.
+2. For the Python/uv path, read `references/configuration.md` and set:
    - `CONTEXT_HUB_BASE_URL`
    - `CONTEXT_HUB_TOKEN`
    - `CONTEXT_HUB_USER_ID`

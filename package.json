@@ -4,6 +4,9 @@
   "description": "npm-installable ctx_cli for ContextHub phase-1 filesystem access",
   "license": "MIT",
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
     "ctx_cli": "dist/cli.js"
   },

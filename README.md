@@ -16,6 +16,8 @@ ctx_cli config set userId shiuing
 printf '%s' 'YOUR_BEARER_TOKEN' | ctx_cli config set token --stdin
 ```
 
+For a fuller agent-oriented walkthrough, see `docs/agent-setup.md`.
+
 ## Use
 
 ```bash
