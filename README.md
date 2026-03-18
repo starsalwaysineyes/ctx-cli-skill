@@ -17,6 +17,12 @@ printf '%s' 'YOUR_BEARER_TOKEN' | ctx_cli config set token --stdin
 ```
 
 For a fuller agent-oriented walkthrough, see `docs/agent-setup.md`.
+You can also inspect bundled docs after install:
+
+```bash
+ctx_cli docs list
+ctx_cli docs read agent-setup.md
+```
 
 ## Use
 

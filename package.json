@@ -1,6 +1,6 @@
 {
   "name": "@shiuing/ctx-cli",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "npm-installable ctx_cli for ContextHub phase-1 filesystem access",
   "license": "MIT",
   "type": "module",
@@ -12,7 +12,10 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "SKILL.md",
+    "docs",
+    "references"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

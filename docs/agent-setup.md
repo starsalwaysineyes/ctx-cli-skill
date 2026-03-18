@@ -6,6 +6,8 @@ This is the fastest path for a new agent or coding environment that needs Contex
 
 ```bash
 npm install -g @shiuing/ctx-cli
+ctx_cli docs list
+ctx_cli docs read agent-setup.md
 ```
 
 ## Configure

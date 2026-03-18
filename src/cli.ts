@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import * as fs from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import * as path from "node:path";
 
 import {
@@ -25,6 +26,7 @@ const CLI_HELP = [
   "usage:",
   "  ctx_cli <op> [args] [--cloud|--local] [--json]",
   "  ctx_cli config <path|list|get|set|unset|use|import-env> [args]",
+  "  ctx_cli docs <path|list|read> [name]",
   "",
   "global options:",
   "  --config <path>    Override config file path (default: ~/.ctx/config.json)",
@@ -54,6 +56,11 @@ async function main(): Promise<void> {
 
   if (args[0] === "config") {
     await handleConfig(args.slice(1), options);
+    return;
+  }
+
+  if (args[0] === "docs") {
+    await handleDocs(args.slice(1));
     return;
   }
 
@@ -136,6 +143,46 @@ async function handleConfig(args: string[], options: CliGlobalOptions): Promise<
   }
 }
 
+async function handleDocs(args: string[]): Promise<void> {
+  const subcommand = args[0] || "list";
+  const root = packageRoot();
+  const docsDir = path.join(root, "docs");
+  const referencesDir = path.join(root, "references");
+
+  switch (subcommand) {
+    case "path": {
+      const target = args[1] || "root";
+      switch (target) {
+        case "root":
+          console.log(root);
+          return;
+        case "docs":
+          console.log(docsDir);
+          return;
+        case "references":
+          console.log(referencesDir);
+          return;
+        default:
+          throw new Error("docs path supports: root, docs, references");
+      }
+    }
+    case "list": {
+      const files = await listDocFiles(root);
+      console.log(files.join("\n"));
+      return;
+    }
+    case "read": {
+      const requested = args[1] || "docs/agent-setup.md";
+      const resolved = resolveDocPath(root, requested);
+      const text = await fs.readFile(resolved, "utf8");
+      process.stdout.write(text.endsWith("\n") ? text : `${text}\n`);
+      return;
+    }
+    default:
+      throw new Error("unsupported docs subcommand: use path, list, or read");
+  }
+}
+
 function parseGlobalOptions(argv: string[]): { args: string[]; options: CliGlobalOptions } {
   const args: string[] = [];
   const options: CliGlobalOptions = {};
@@ -201,6 +248,51 @@ function normalizeOutputKey(key: string): string {
     default:
       return key;
   }
+}
+
+function packageRoot(): string {
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+}
+
+async function listDocFiles(root: string): Promise<string[]> {
+  const outputs: string[] = [];
+  for (const relative of ["SKILL.md", "README.md"]) {
+    try {
+      await fs.access(path.join(root, relative));
+      outputs.push(relative);
+    } catch {
+      // Ignore missing optional files.
+    }
+  }
+  for (const base of ["docs", "references"]) {
+    const directory = path.join(root, base);
+    try {
+      const entries = await fs.readdir(directory, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isFile()) outputs.push(`${base}/${entry.name}`);
+      }
+    } catch {
+      // Ignore missing directories.
+    }
+  }
+  return outputs.sort();
+}
+
+function resolveDocPath(root: string, requested: string): string {
+  const trimmed = requested.trim();
+  if (!trimmed) throw new Error("docs read requires a file name");
+  const normalized = trimmed.replace(/^\.\//, "");
+  const candidate = (() => {
+    if (["SKILL.md", "README.md"].includes(normalized)) return normalized;
+    if (normalized.startsWith("docs/") || normalized.startsWith("references/")) return normalized;
+    if (normalized.endsWith(".md")) return `docs/${normalized}`;
+    return `docs/${normalized}.md`;
+  })();
+  const resolved = path.resolve(root, candidate);
+  if (!resolved.startsWith(root + path.sep) && resolved !== path.join(root, "SKILL.md") && resolved !== path.join(root, "README.md")) {
+    throw new Error("docs path escapes package root");
+  }
+  return resolved;
 }
 
 async function readStdin(): Promise<string> {
