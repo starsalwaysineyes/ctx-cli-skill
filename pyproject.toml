@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ctx-cli-skill"
-version = "0.1.3"
+version = "0.1.4"
 description = "Portable ctx_cli bundle for ContextHub phase-1 filesystem access"
 readme = "SKILL.md"
 requires-python = ">=3.11"

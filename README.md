@@ -11,8 +11,8 @@ npm install -g @shiuing/ctx-cli
 ## Configure
 
 ```bash
-ctx_cli config set baseUrl http://38.55.39.92:24040
-ctx_cli config set userId shiuing
+ctx_cli config set baseUrl http://YOUR_HOST:24040
+ctx_cli config set userId YOUR_USER_ID
 printf '%s' 'YOUR_BEARER_TOKEN' | ctx_cli config set token --stdin
 ```
 
