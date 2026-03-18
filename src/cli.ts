@@ -16,6 +16,7 @@ import {
   setProfileValue,
   unsetProfileValue,
   type CliGlobalOptions,
+  type CtxCliConfigFile,
   type CtxCliProfile,
 } from "./config.js";
 import { CtxRuntime, HELP_TEXT } from "./runtime.js";
@@ -25,8 +26,9 @@ const CLI_HELP = [
   "",
   "usage:",
   "  ctx_cli <op> [args] [--cloud|--local] [--json]",
-  "  ctx_cli config <path|list|get|set|unset|use|import-env> [args]",
+  "  ctx_cli config <path|list|get|set|unset|use|import-env|resolve> [args]",
   "  ctx_cli docs <path|list|read> [name]",
+  "  ctx_cli doctor [--json] [--show-secret]",
   "",
   "global options:",
   "  --config <path>    Override config file path (default: ~/.ctx/config.json)",
@@ -37,7 +39,9 @@ const CLI_HELP = [
   "  ctx_cli config set userId YOUR_USER_ID",
   "  printf '%s' 'TOKEN' | ctx_cli config set token --stdin",
   "  ctx_cli config import-env",
+  "  ctx_cli config resolve",
   "  ctx_cli config list",
+  "  ctx_cli doctor",
   "",
   "runtime notes:",
   "  precedence = command flags > env vars > ~/.ctx/config.json",
@@ -61,6 +65,11 @@ async function main(): Promise<void> {
 
   if (args[0] === "docs") {
     await handleDocs(args.slice(1));
+    return;
+  }
+
+  if (args[0] === "doctor") {
+    await handleDoctor(args.slice(1), options);
     return;
   }
 
@@ -138,8 +147,31 @@ async function handleConfig(args: string[], options: CliGlobalOptions): Promise<
       console.log(`imported environment into profile ${profileName}`);
       return;
     }
+    case "resolve": {
+      const showSecret = args.includes("--show-secret");
+      const inspection = await inspectRuntimeConfig(config, configPath, options);
+      console.log(JSON.stringify(renderResolvedConfig(inspection, showSecret), null, 2));
+      return;
+    }
     default:
       throw new Error(`unsupported config subcommand: ${subcommand}`);
+  }
+}
+
+async function handleDoctor(args: string[], options: CliGlobalOptions): Promise<void> {
+  const configPath = options.configPath || defaultConfigPath();
+  const config = await loadConfigFile(configPath);
+  const inspection = await inspectRuntimeConfig(config, configPath, options);
+  const report = await runDoctorChecks(inspection);
+  const asJson = args.includes("--json");
+  const showSecret = args.includes("--show-secret");
+  if (asJson) {
+    console.log(JSON.stringify(renderDoctorReport(inspection, report, showSecret), null, 2));
+  } else {
+    console.log(renderDoctorText(inspection, report, showSecret));
+  }
+  if (report.some((check) => check.status === "fail")) {
+    process.exitCode = 1;
   }
 }
 
@@ -182,6 +214,34 @@ async function handleDocs(args: string[]): Promise<void> {
       throw new Error("unsupported docs subcommand: use path, list, or read");
   }
 }
+
+type RuntimeValueSource = "env" | "config" | "default" | "unset";
+
+type RuntimeInspection = {
+  configPath: string;
+  configFileExists: boolean;
+  profile: string;
+  resolved: {
+    baseUrl: string;
+    token?: string;
+    userId?: string;
+    localRoot: string;
+    timeoutMs: number;
+  };
+  sources: {
+    baseUrl: RuntimeValueSource;
+    token: RuntimeValueSource;
+    userId: RuntimeValueSource;
+    localRoot: RuntimeValueSource;
+    timeoutMs: RuntimeValueSource;
+  };
+};
+
+type DoctorCheck = {
+  name: string;
+  status: "ok" | "warn" | "fail";
+  detail: string;
+};
 
 function parseGlobalOptions(argv: string[]): { args: string[]; options: CliGlobalOptions } {
   const args: string[] = [];
@@ -293,6 +353,197 @@ function resolveDocPath(root: string, requested: string): string {
     throw new Error("docs path escapes package root");
   }
   return resolved;
+}
+
+async function inspectRuntimeConfig(
+  config: CtxCliConfigFile,
+  configPath: string,
+  options: CliGlobalOptions,
+): Promise<RuntimeInspection> {
+  const profileName = resolveProfileName(config, options.profile);
+  const profile = getProfile(config, profileName);
+  const resolved = resolveRuntimeConfig(config, options);
+  return {
+    configPath: path.resolve(configPath),
+    configFileExists: await pathExists(configPath),
+    profile: profileName,
+    resolved: {
+      baseUrl: resolved.baseUrl,
+      token: resolved.token,
+      userId: resolved.defaultUserId,
+      localRoot: resolved.localRoot,
+      timeoutMs: resolved.timeoutMs,
+    },
+    sources: {
+      baseUrl: sourceForString(process.env.CONTEXT_HUB_BASE_URL, profile.baseUrl, true),
+      token: sourceForString(process.env.CONTEXT_HUB_TOKEN, profile.token, false),
+      userId: sourceForString(process.env.CONTEXT_HUB_USER_ID, profile.userId, false),
+      localRoot: sourceForString(process.env.CTX_CLI_LOCAL_ROOT, profile.localRoot, true),
+      timeoutMs: sourceForTimeout((process.env.CTX_CLI_TIMEOUT_MS || "").trim(), profile.timeoutMs),
+    },
+  };
+}
+
+async function runDoctorChecks(inspection: RuntimeInspection): Promise<DoctorCheck[]> {
+  const checks: DoctorCheck[] = [];
+  checks.push({
+    name: "config-file",
+    status: inspection.configFileExists ? "ok" : "warn",
+    detail: inspection.configFileExists ? `found ${inspection.configPath}` : `missing ${inspection.configPath}`,
+  });
+  checks.push({
+    name: "base-url",
+    status: inspection.resolved.baseUrl ? "ok" : "fail",
+    detail: inspection.resolved.baseUrl || "baseUrl is empty",
+  });
+  checks.push({
+    name: "user-id",
+    status: inspection.resolved.userId ? "ok" : "warn",
+    detail: inspection.resolved.userId || "userId is not configured",
+  });
+  checks.push({
+    name: "token",
+    status: inspection.resolved.token ? "ok" : "warn",
+    detail: inspection.resolved.token ? "token is configured" : "token is not configured",
+  });
+
+  const healthUrl = `${inspection.resolved.baseUrl.replace(/\/$/, "")}/health`;
+  try {
+    const response = await fetch(healthUrl, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(inspection.resolved.timeoutMs),
+    });
+    const text = await response.text();
+    if (!response.ok) {
+      checks.push({
+        name: "health",
+        status: "fail",
+        detail: `GET /health -> ${response.status} ${response.statusText}${text ? ` :: ${text}` : ""}`,
+      });
+    } else {
+      checks.push({
+        name: "health",
+        status: "ok",
+        detail: `GET /health -> ${response.status}`,
+      });
+    }
+  } catch (error) {
+    checks.push({
+      name: "health",
+      status: "fail",
+      detail: `GET /health failed: ${error instanceof Error ? error.message : String(error)}`,
+    });
+  }
+
+  if (!inspection.resolved.userId || !inspection.resolved.token) {
+    checks.push({
+      name: "cloud-access",
+      status: "warn",
+      detail: "skipped authenticated cloud check because userId or token is missing",
+    });
+    return checks;
+  }
+
+  try {
+    const baseUrl = inspection.resolved.baseUrl.replace(/\/$/, "");
+    const url = new URL(`${baseUrl}/v1/fs/ls`);
+    url.searchParams.set("uri", `ctx://${inspection.resolved.userId}`);
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${inspection.resolved.token}`,
+      },
+      signal: AbortSignal.timeout(inspection.resolved.timeoutMs),
+    });
+    const text = await response.text();
+    if (!response.ok) {
+      checks.push({
+        name: "cloud-access",
+        status: "fail",
+        detail: `GET /v1/fs/ls ctx://${inspection.resolved.userId} -> ${response.status} ${response.statusText}${text ? ` :: ${text}` : ""}`,
+      });
+    } else {
+      checks.push({
+        name: "cloud-access",
+        status: "ok",
+        detail: `GET /v1/fs/ls ctx://${inspection.resolved.userId} -> ${response.status}`,
+      });
+    }
+  } catch (error) {
+    checks.push({
+      name: "cloud-access",
+      status: "fail",
+      detail: `authenticated cloud check failed: ${error instanceof Error ? error.message : String(error)}`,
+    });
+  }
+
+  return checks;
+}
+
+function renderResolvedConfig(inspection: RuntimeInspection, showSecret: boolean): Record<string, unknown> {
+  return {
+    configPath: inspection.configPath,
+    configFileExists: inspection.configFileExists,
+    profile: inspection.profile,
+    resolved: {
+      baseUrl: inspection.resolved.baseUrl,
+      userId: inspection.resolved.userId ?? null,
+      token: inspection.resolved.token ? redactValue("token", inspection.resolved.token, showSecret) : null,
+      localRoot: inspection.resolved.localRoot,
+      timeoutMs: inspection.resolved.timeoutMs,
+    },
+    sources: inspection.sources,
+  };
+}
+
+function renderDoctorReport(inspection: RuntimeInspection, checks: DoctorCheck[], showSecret: boolean): Record<string, unknown> {
+  return {
+    ...renderResolvedConfig(inspection, showSecret),
+    checks,
+  };
+}
+
+function renderDoctorText(inspection: RuntimeInspection, checks: DoctorCheck[], showSecret: boolean): string {
+  const lines = [
+    "ctx_cli doctor",
+    "",
+    `config path: ${inspection.configPath}`,
+    `config file: ${inspection.configFileExists ? "present" : "missing"}`,
+    `profile: ${inspection.profile}`,
+    "",
+    "resolved config:",
+    `- baseUrl: ${inspection.resolved.baseUrl} [${inspection.sources.baseUrl}]`,
+    `- userId: ${inspection.resolved.userId ?? "<unset>"} [${inspection.sources.userId}]`,
+    `- token: ${inspection.resolved.token ? redactValue("token", inspection.resolved.token, showSecret) : "<unset>"} [${inspection.sources.token}]`,
+    `- localRoot: ${inspection.resolved.localRoot} [${inspection.sources.localRoot}]`,
+    `- timeoutMs: ${inspection.resolved.timeoutMs} [${inspection.sources.timeoutMs}]`,
+    "",
+    "checks:",
+    ...checks.map((check) => `- ${check.name}: ${check.status.toUpperCase()} - ${check.detail}`),
+  ];
+  return lines.join("\n");
+}
+
+function sourceForString(envValue: string | undefined, configValue: string | undefined, hasDefault: boolean): RuntimeValueSource {
+  if ((envValue || "").trim()) return "env";
+  if ((configValue || "").trim()) return "config";
+  return hasDefault ? "default" : "unset";
+}
+
+function sourceForTimeout(envValue: string, configValue: number | undefined): RuntimeValueSource {
+  const envTimeout = Number(envValue);
+  if (envValue && Number.isFinite(envTimeout) && envTimeout > 0) return "env";
+  if (configValue !== undefined && Number.isFinite(Number(configValue)) && Number(configValue) > 0) return "config";
+  return "default";
+}
+
+async function pathExists(target: string): Promise<boolean> {
+  try {
+    await fs.access(target);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function readStdin(): Promise<string> {

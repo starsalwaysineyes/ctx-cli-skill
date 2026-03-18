@@ -22,6 +22,8 @@ You can also inspect bundled docs after install:
 ```bash
 ctx_cli docs list
 ctx_cli docs read agent-setup.md
+ctx_cli config resolve
+ctx_cli doctor
 ```
 
 ## Use

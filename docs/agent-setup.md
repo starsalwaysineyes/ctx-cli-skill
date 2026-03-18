@@ -26,6 +26,8 @@ Config is stored in `~/.ctx/config.json` by default.
 
 ```bash
 ctx_cli config list
+ctx_cli config resolve
+ctx_cli doctor
 ctx_cli search --query 'cloud cutover' --limit 1
 ctx_cli reindex --scope-uri ctx://YOUR_USER_ID/defaultWorkspace/docs
 ctx_cli read ctx://YOUR_USER_ID/defaultWorkspace/docs/ctx-usage-experience.md
