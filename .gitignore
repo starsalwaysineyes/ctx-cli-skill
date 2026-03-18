@@ -1,5 +1,5 @@
-__pycache__/
-*.pyc
-.venv/
-.dist/
+node_modules/
 dist/
+**/__pycache__/
+*.tgz
+.DS_Store

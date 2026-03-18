@@ -1,0 +1,26 @@
+{
+  "name": "@starsalwaysineyes/ctx-cli",
+  "version": "0.1.2",
+  "description": "npm-installable ctx_cli for ContextHub phase-1 filesystem access",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "ctx_cli": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc --noEmit",
+    "prepack": "npm run build"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

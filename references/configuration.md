@@ -58,7 +58,7 @@ Validate with:
 bash -lc 'printf "%s\n" "$CONTEXT_HUB_BASE_URL" "$CONTEXT_HUB_USER_ID"'
 ```
 
-## Two ways to use the repo
+## Three ways to use the repo
 
 ### 1. No install, use bundled wrapper
 
@@ -68,13 +68,30 @@ bash -lc 'printf "%s\n" "$CONTEXT_HUB_BASE_URL" "$CONTEXT_HUB_USER_ID"'
 
 This is the most portable path for agents.
 
-### 2. Install global executables
+### 2. Install global executables via uv
 
 ```bash
 cd /path/to/ctx-cli-skill
 uv tool install --from . ctx-cli-skill --force --reinstall --refresh --no-cache
 ctx_cli ls ctx://YOUR_USER_ID
 ```
+
+### 3. Install npm CLI with config file support
+
+```bash
+npm install -g @starsalwaysineyes/ctx-cli
+ctx_cli config set baseUrl http://YOUR_HOST:24040
+ctx_cli config set userId YOUR_USER_ID
+printf '%s' 'YOUR_BEARER_TOKEN' | ctx_cli config set token --stdin
+ctx_cli search --query 'cloud cutover'
+```
+
+The npm CLI stores config in `~/.ctx/config.json` by default and merges values with this precedence:
+
+1. command-line flags
+2. environment variables
+3. `~/.ctx/config.json`
+4. built-in defaults
 
 ## Common checks
 
@@ -101,7 +118,7 @@ Write a file:
 ## Security notes
 
 - Never commit a real bearer token into this repo.
-- Prefer shell env vars or a local secret store.
+- Prefer shell env vars, `ctx_cli config set token --stdin`, or a local secret store.
 - Replace `YOUR_HOST`, `YOUR_BEARER_TOKEN`, and `YOUR_USER_ID` before use.
-- Commands that require a user scope (`register-workspace`, `search`, `glob`, `grep`, `rg`, `reindex`) can now omit `--user-id` when `CONTEXT_HUB_USER_ID` is set.
+- Commands that require a user scope (`register-workspace`, `search`, `glob`, `grep`, `rg`, `reindex`) can now omit `--user-id` when `CONTEXT_HUB_USER_ID` is set or when npm config stores `userId`.
 - `search` defaults to `defaultWorkspace`; only pass `--workspace-mode user` or `--workspace-mode default-first` when you intentionally want a broader scope.

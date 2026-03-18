@@ -5,7 +5,10 @@ description: Use the bundled ctx_cli executable to access a ContextHub phase-1 c
 
 # ctx-cli
 
-This skill ships a usable `ctx_cli` with the repo itself.
+This repo now ships two usable `ctx_cli` entrypoints:
+
+- the original `uv`/Python wrapper in `./scripts/ctx_cli`
+- an npm-installable Node CLI that reads `~/.ctx/config.json`
 
 ## Use this first
 
@@ -58,15 +61,28 @@ Search/import examples:
 
 ## Optional global install
 
-If the caller wants a real shell command on `PATH`:
+### Python / uv path
 
 ```bash
 uv tool install --from . ctx-cli-skill --force --reinstall --refresh --no-cache
 ctx_cli ls ctx://YOUR_USER_ID
 ```
 
+### npm path
+
+If the caller wants a config-file-first CLI without relying on shell exports:
+
+```bash
+npm install -g @starsalwaysineyes/ctx-cli
+ctx_cli config set baseUrl http://YOUR_HOST:24040
+ctx_cli config set userId YOUR_USER_ID
+printf '%s' 'YOUR_BEARER_TOKEN' | ctx_cli config set token --stdin
+ctx_cli search --query 'cloud cutover'
+```
+
 ## Notes
 
 - `ctx_cli` is the cloud/filesystem operator surface.
-- It reads auth from shell env, not from hardcoded repo secrets.
+- The npm CLI stores config in `~/.ctx/config.json`; command-line flags and env vars still override it.
+- The legacy Python wrapper still reads auth from shell env.
 - Keep examples generic; do not commit real bearer tokens or private endpoints into downstream repos.
